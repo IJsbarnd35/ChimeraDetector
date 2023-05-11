@@ -21,8 +21,37 @@ def create_df(fastq):
 # Read paf file
 def find_chimeras(df):
     reads = df["query_name"].unique()
+    
+    chimeras = 0
+    chimeralist = []
     for read in reads:
-        print(read)
+        ding = df[(df['query_name'] == read) & (df['target_name'] == read)]
+        if len(ding["query_length"].unique()) >= 2:
+            # Skip and remove the read if it has multiple sequence lengths, probably a minimap error
+            df = df[df.query_name != read]
+            df = df[df.target_name != read]
+            reads = reads[reads != read]
+            continue
+        if len(ding) >= 1:
+            # Ignore all reads shorter than the threshold
+            if ding['query_length'].unique() >= 2000:
+                strand = ding['strand'].unique()
+                if strand == "-":
+                    # check coverage
+                    # If 2 different parts, meaning if there is a middle part -> ?
+                    for index, match in ding.iterrows():
+                        if (match[3] - match[2]) / match[1] >= 0.5:
+                            chimeras += 1
+                            chimeralist.append(read)
+                elif len(strand) == 2:
+                    # check if '-' has full coverage
+                    for index, match in ding.iterrows():
+                        if match[4] == "-" and (match[3] - match[2]) / match[1] >= 0.5:
+                            print(read, " is a chimera")
+                            chimeras += 1
+                            chimeralist.append(read)
+    print("chimeras ", chimeras)
+    print(chimeralist)
 
 # Seperate chimeras from repeats
 
