@@ -21,7 +21,7 @@ def create_df(fastq):
 # Read paf file
 def find_chimeras(df):
     reads = df["query_name"].unique()
-    
+
     chimeras = 0
     chimeralist = []
     for read in reads:
@@ -60,5 +60,9 @@ def find_chimeras(df):
 
 # Execute
 if __name__ == '__main__':
-    df = create_df("D:/School/stage2/lisan/Graduation/Graduation/overlaps.paf")
-    print(df)
+    #df = create_df("D:/School/stage2/lisan/Graduation/Graduation/overlaps.paf")
+    df = pd.read_csv("D:/School/stage2/lisan/Graduation/Graduation/overlaps.paf", sep='\t', usecols=[0, 1, 2, 3, 4, 5, 6, 7, 8], header=None)
+    df.columns = ['query_name', 'query_length', 'query_start', 'query_end', "strand", 'target_name', 'target_length',
+                  'target_start', 'target_end']
+
+    find_chimeras(df)
