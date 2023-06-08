@@ -1,8 +1,6 @@
 import random
 from Bio.Seq import Seq
 from Bio.Align import PairwiseAligner
-from Bio.Align.AlignInfo import SummaryInfo
-from docopt import docopt
 import re
 import time
 
@@ -24,12 +22,10 @@ def make_chimera(flength, mlength, rlength):
 
 
 def add_errors(read):
-    #amount = int(len(read) * (random.randint(1, 10) / 100))
     amount = int(len(read) * 0.1)
     read = list(read)
     positions = random.sample(range(0, len(read)), amount)
     for pos in positions:
-        # Kan dezelfde zijn, volgens mij niet erg, voegt meer random toe??
         read[pos] = random.choice(["A", "C", "T", "G"])
     return Seq(''.join(read))
 
@@ -39,14 +35,8 @@ def make_normal(length):
     return ''.join(([random.choice(bases) for x in range(length)]))
 
 
-def check_chimera_flat(read):
-    print(read)
-    # Figure out how many and how long the parts should be
-    if len(read) < 3000:
-        interval = 15
-    else:
-        interval = 50
-    interval = 200
+def check_chimera_flat(read, interval):
+    interval = interval
 
     old_cut = 0
     new_cut = interval
@@ -68,12 +58,10 @@ def check_chimera_flat(read):
 
     read = str(read)
 
-    #for part in range(parts):
     if len(read) < 500:
         x = int(len(read) * 0.5)
     else:
         x = int(len(read) * 0.25)
-    bp = len(read)-x
     fnscore = 0
     rnscore = 0
     count = 0
@@ -93,9 +81,7 @@ def check_chimera_flat(read):
             if old_cut == 0:
                 slice = str(Seq(read[-new_cut:]).reverse_complement())
                 temp_read = read[:-new_cut]
-                #slice = str(Seq(read[bp + old_cut:bp + new_cut]).reverse_complement())
             else:
-                #slice = str(Seq(read[bp + old_cut:bp + new_cut]).reverse_complement())
                 slice = str(Seq(read[-new_cut:-old_cut]).reverse_complement())
                 temp_read = read[:-new_cut]
         # Align
@@ -111,21 +97,19 @@ def check_chimera_flat(read):
 
         if mode == "forward":
             positions_forward.append([epos, bpos])
-            if identity < 0.75: # and count > 2:
+            if identity < 0.75:
                 fnscore = fnscore + (0.75 - identity)
             elif fnscore > 0 and identity > 0.8:
                 fnscore = fnscore - (identity - 0.8)
             matches_forward.append(identity)
-            #matches_forward.append([identity, bpos, epos])
             mode = "reverse"
         elif mode == "reverse":
             positions_reversed.append([bpos, epos])
-            if identity < 0.75: # and count > 2:
+            if identity < 0.75:
                 rnscore = rnscore + (0.75 - identity)
             elif rnscore > 0 and identity > 0.8:
                 rnscore = rnscore - (identity - 0.8)
             matches_reversed.append(identity)
-            #matches_reversed.append([identity, bpos, epos])
             old_cut = new_cut
             new_cut += interval
             mode = "forward"
@@ -182,39 +166,25 @@ def file_reader(input_file):
     return reads, sequences
 
 
-def check_file(file):
+def self_aligned(file, interval=75, minlength=2000):
     reads, sequences = file_reader(file)
-    start = time.time()
 
     chimeras = []
     count = 0
     for seq in sequences:
-        if check_chimera_flat(seq) > 0.6:
-            chimeras.append(reads[count])
+        if len(seq) > minlength:
+            if check_chimera_flat(seq, interval) > 0.6:
+                chimeras.append(reads[count])
         count += 1
-    print(chimeras)
-    with open(file, "r+") as f:
-        d = f.readlines()
-        f.seek(0)
-        count = 0
-        while count < len(d):
-            if any(chimera in d[count] for chimera in chimeras):
-                count += 4
-                continue
-            else:
-                f.write(d[count])
-            count += 1
-        f.truncate()
 
-    end = time.time()
-    print(end - start)
+    return chimeras
 
 
-if __name__ == '__main__':
-    doc = """
-    Usage:
-      Self_Aligned.py <file>
-      comtest.py (-h | --help)
-    """
-    arguments = docopt(__doc__)
-    check_file(arguments["<file>"])
+#if __name__ == '__main__':
+#    doc = """
+#    Usage:
+#      Self_Aligned.py <file>
+#      comtest.py (-h | --help)
+#    """
+#    arguments = docopt(__doc__)
+#    check_file(arguments["<file>"])
