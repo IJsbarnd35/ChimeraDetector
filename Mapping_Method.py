@@ -32,8 +32,13 @@ def create_df(fastq):
     """
     if os.path.exists(fastq):
         try:
+            # Find the minimap2 executable
+            minimap_executable = subprocess.run('find / -type f -name "minimap2" -executable -print -quit 2>/dev/null',
+                                                shell=True, capture_output=True, text=True)
+            minimap_location = minimap_executable.stdout.strip()
+
             # Execute minimap2 command to generate overlaps.paf file
-            minimap_command = f"./minimap2/minimap2 -x ava-ont {fastq} {fastq} > overlaps.paf"
+            minimap_command = f"{minimap_location} -x ava-ont {fastq} {fastq} > overlaps.paf"
             subprocess.run(minimap_command, shell=True, check=True)
 
             # Define column names for the DataFrame
