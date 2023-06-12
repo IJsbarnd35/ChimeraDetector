@@ -1,41 +1,33 @@
-import random
-from Bio.Seq import Seq
+#!/usr/bin/env python3
+"""
+Self_Aligned.py: Created for chimera detection.
+Author: IJsbrand Pool
+Version: 1.3.3
+Date: 09-06-2023
+"""
+
 from Bio.Align import PairwiseAligner
 import re
-import time
-
-
-def make_chimera(flength, mlength, rlength):
-    bases = ["A", "C", "T", "G"]
-    middle = ''.join([random.choice(bases) for x in range(mlength)])
-
-    if rlength > flength:
-        fullforward = ''.join([random.choice(bases) for x in range(rlength)])
-        forward = fullforward[-flength:]
-        reverse_complement = Seq(fullforward).reverse_complement()
-    else:
-        forward = ''.join([random.choice(bases) for x in range(flength)])
-        reverse_complement = Seq(forward[-rlength:]).reverse_complement()
-
-    read = Seq(forward + middle + reverse_complement)
-    return add_errors(read)
-
-
-def add_errors(read):
-    amount = int(len(read) * 0.1)
-    read = list(read)
-    positions = random.sample(range(0, len(read)), amount)
-    for pos in positions:
-        read[pos] = random.choice(["A", "C", "T", "G"])
-    return Seq(''.join(read))
-
-
-def make_normal(length):
-    bases = ["A", "C", "T", "G"]
-    return ''.join(([random.choice(bases) for x in range(length)]))
+from Bio.Seq import Seq
 
 
 def check_chimera_flat(read, interval):
+    """
+    Check for chimeric regions in a DNA read using pairwise alignment.
+
+    This function divides the DNA read into intervals and performs pairwise alignment between
+    subsequences to detect potential chimeric regions. It calculates alignment scores, identifies
+    positions, and calculates scores for forward and reversed alignments. It also performs validation
+    by checking the proximity of aligned positions.
+
+    Args:
+        read (str): The DNA read sequence.
+        interval (int): The interval length for dividing the read.
+
+    Returns:
+        float: The maximum alignment score for forward, reversed, or validated alignments.
+
+    """
     interval = interval
 
     old_cut = 0
@@ -51,6 +43,7 @@ def check_chimera_flat(read, interval):
     # Make the aligner
     aligner = PairwiseAligner()
     aligner.mode = 'local'
+
     # Assign costs
     aligner.mismatch_score = -0.5
     aligner.open_gap_score = -0.5
@@ -115,76 +108,104 @@ def check_chimera_flat(read, interval):
             mode = "forward"
             count += 1
 
-    print(matches_forward)
-    print(matches_reversed)
-
     forward_score = sum(matches_forward)/len(matches_forward)
     reversed_score = sum(matches_reversed)/len(matches_reversed)
-    print("forward :", forward_score)
-    print("reversed :", reversed_score)
 
-    print(positions_forward)
-    print(positions_reversed)
-
-    if forward_score >= 0.75:
+    forward_valscore = 0
+    reversed_valscore = 0
+    if forward_score >= 0.6:
         #validate
-        valscore = 0
         for match in range(len(matches_forward)-1):
             if abs(positions_forward[match][1] - positions_forward[match+1][0]) < 5:
-                valscore += 1
-        valscore = valscore/(len(matches_forward)-1)
-    elif reversed_score >= 0.75:
+                forward_valscore += 1
+        forward_valscore = forward_valscore/(len(matches_forward)-1)
+        forward_score = forward_score + forward_valscore/4
+    if reversed_score >= 0.6:
         # validate
-        valscore = 0
         for match in range(len(matches_reversed) - 1):
             if abs(positions_reversed[match][1] - positions_reversed[match + 1][0]) < 5:
-                valscore += 1
-        valscore = valscore/(len(matches_reversed)-1)
-
+                reversed_valscore += 1
+        reversed_valscore = reversed_valscore/(len(matches_reversed)-1)
+        reversed_score = reversed_score + reversed_valscore/4
     return max(forward_score, reversed_score, 0)
 
 
 def file_reader(input_file):
+    """
+    Read an input file and extract reads and sequences.
+
+    This function reads the input file line by line and extracts the read numbers and sequences.
+    It uses regular expressions to isolate the sequences and read numbers from each line.
+    The extracted reads and sequences are returned as lists.
+
+    Args:
+        input_file (str): The path to the input file.
+
+    Returns:
+        tuple: A tuple containing two lists - reads and sequences.
+
+    """
     reads = []
     sequences = []
-    """ Reads through the Fastq file and extracts the sequences and read numbers. """
+
+    # Iterate through each line in the input file
     for line in open(input_file):
-        # Isolates the sequences.
+
+        # Isolates the sequences using regular expression pattern matching
         sequence = re.compile("^[A-Z]{5,}")
-        # Isolates the read numbers.
+
+        # Isolates the read numbers using regular expression pattern matching
         read = re.compile("read=\d*")
-        # Finds all the matches.
-        match = (read.findall(line.strip()))
-        seqmatch = (sequence.findall(line.strip()))
-        # Removes empty matches
-        if match != [] or seqmatch != []:
+
+        # Finds all the matches for reads and sequences in the line
+        match = read.findall(line.strip())
+        seqmatch = sequence.findall(line.strip())
+
+        # Remove empty matches and append the non-empty reads and sequences
+        if match:
+            reads.append(''.join(match))
+        elif seqmatch:
+            sequences.append(''.join(seqmatch))
+
+
+        # Remove empty elements from the lists if present
+        while match and seqmatch:
             reads.append(''.join(match))
             sequences.append(''.join(seqmatch))
-        while '' in reads and '' in sequences:
-            reads.remove("")
-            sequences.remove("")
+
     return reads, sequences
 
 
 def self_aligned(file, interval=75, minlength=2000):
+    """
+    Identify self-aligned chimeric reads from an input file.
+
+    This function reads an input file and identifies self-aligned chimeric reads by applying the following steps:
+    1. Reads and sequences are extracted using the 'file_reader' function.
+    2. For each sequence, if the length is greater than the specified 'minlength':
+        - The 'check_chimera_flat' function is called to check the chimera score based on the given 'interval'.
+        - If the chimera score is greater than 0.6, the read ID is appended to the 'chimeras' list.
+    3. The 'chimeras' list containing the read IDs of self-aligned chimeric reads is returned.
+
+    Args:
+        file (str): The path to the input file.
+        interval (int, optional): The interval used for checking chimera score. Defaults to 75.
+        minlength (int, optional): The minimum length required for a sequence to be considered. Defaults to 2000.
+
+    Returns:
+        list: A list containing the read IDs of self-aligned chimeric reads.
+
+    """
     reads, sequences = file_reader(file)
 
     chimeras = []
     count = 0
     for seq in sequences:
         if len(seq) > minlength:
-            if check_chimera_flat(seq, interval) > 0.6:
+            if check_chimera_flat(seq, interval) > 0.75:
                 chimeras.append(reads[count])
         count += 1
-
+    print(chimeras)
     return chimeras
 
-
-#if __name__ == '__main__':
-#    doc = """
-#    Usage:
-#      Self_Aligned.py <file>
-#      comtest.py (-h | --help)
-#    """
-#    arguments = docopt(__doc__)
-#    check_file(arguments["<file>"])
+self_aligned("D:/School/stage2/data/b1_1.fq")
