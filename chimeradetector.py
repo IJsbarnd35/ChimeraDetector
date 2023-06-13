@@ -1,13 +1,12 @@
-"""Not a serious example.
+#!/usr/bin/env python3
+"""
 Usage:
-  comtest.py --fastq <fastqfile> --method <method>
-  comtest.py (-h | --help)
+  chimeradetector.py <fastqfile> <method> [--size_slice=<slice_size>] [--length=<length>]
+  chimeradetector.py (-h | --help)
 Options:
   -h, --help
-  -f, --fastq
-  -m, --method
-  -s, --size_slice
-  -l, --length
+  --size_slice=<slice_size>
+  --length=<length>
 """
 from docopt import docopt
 import os
@@ -24,11 +23,11 @@ if __name__ == '__main__':
     chimeras = []
     if os.path.exists(file):
         if arguments["<method>"] == "self_aligned":
-            chimeras = self_aligned(file, arguments["--slice_size"], arguments["--length"])
+            chimeras = self_aligned(file, arguments["--size_slice"], arguments["--length"])
         elif arguments["<method>"] == "mapping":
             chimeras = mapping_method(file)
         elif arguments["<method>"] == "both":
-            for self_aligned_chimera in self_aligned(file, arguments["--slice_size"], arguments["--length"]):
+            for self_aligned_chimera in self_aligned(file, arguments["--size_slice"], arguments["--length"]):
                 chimeras.append(self_aligned_chimera)
             for mapping_chimera in mapping_method(file):
                 if mapping_chimera not in chimeras:

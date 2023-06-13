@@ -207,5 +207,3 @@ def self_aligned(file, interval=75, minlength=2000):
         count += 1
     print(chimeras)
     return chimeras
-
-self_aligned("D:/School/stage2/data/b1_1.fq")
